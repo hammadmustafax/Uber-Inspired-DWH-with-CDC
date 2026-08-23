@@ -19,6 +19,7 @@ def haversine_distance_km(lat1: float, lng1: float, lat2: float, lng2: float) ->
                between two latitude/longitude coordinates.
     Formula: Haversine equation using Earth radius R = 6371 km.
     """
+    lat1, lng1, lat2, lng2 = map(float, [lat1, lng1, lat2, lng2])
     R = 6371.0  # Earth's radius in kilometers
 
     d_lat = math.radians(lat2 - lat1)
@@ -39,6 +40,7 @@ def calculate_heading(lat1: float, lng1: float, lat2: float, lng2: float) -> flo
     """
     Calculates the compass bearing / heading angle (0° to 360°) from point 1 to point 2.
     """
+    lat1, lng1, lat2, lng2 = map(float, [lat1, lng1, lat2, lng2])
     d_lng = math.radians(lng2 - lng1)
     lat1_rad = math.radians(lat1)
     lat2_rad = math.radians(lat2)
@@ -58,6 +60,8 @@ def generate_random_coordinate(center_lat: float, center_lng: float, radius_km: 
     """
     Generates a random GPS coordinate within a given kilometer radius of a city center.
     """
+    center_lat = float(center_lat)
+    center_lng = float(center_lng)
     # 1 degree latitude is approximately 111 km
     radius_in_degrees = radius_km / 111.0
 
@@ -86,6 +90,7 @@ def move_towards(
     at speed_kmh over delta_time_sec seconds.
     Returns: (new_lat, new_lng, heading, has_arrived)
     """
+    current_lat, current_lng, target_lat, target_lng = map(float, [current_lat, current_lng, target_lat, target_lng])
     total_distance_km = haversine_distance_km(current_lat, current_lng, target_lat, target_lng)
     heading = calculate_heading(current_lat, current_lng, target_lat, target_lng)
 

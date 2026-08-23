@@ -17,12 +17,20 @@ from generator.config import (
 )
 from generator.db import get_db_session
 from generator.models import (
-    City, User, Driver, Vehicle, TripRequest, Trip, Payment, Rating
+    City, User, Driver, Vehicle, TripRequest, Trip, Payment, Rating, Promotion
 )
 from generator.telemetry import (
     generate_random_coordinate, haversine_distance_km, move_towards,
     create_driver_telemetry_ping
 )
+
+def make_naive(dt):
+    """Strips timezone info to allow datetime arithmetic between naive and aware timestamps."""
+    if dt is None:
+        return None
+    if getattr(dt, "tzinfo", None) is not None:
+        return dt.replace(tzinfo=None)
+    return dt
 
 # Realistic fare estimation parameters
 BASE_FARES = {"uberx": 2.50, "comfort": 4.00, "xl": 6.00, "black": 10.00}
@@ -214,7 +222,8 @@ def step_active_trips():
                     trip.completed_at = now
 
                     distance = haversine_distance_km(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng)
-                    duration = int((now - (trip.started_at or now)).total_seconds()) + random.randint(300, 1200)
+                    started_at = make_naive(trip.started_at) or now
+                    duration = int((now - started_at).total_seconds()) + random.randint(300, 1200)
                     
                     vehicle_type = session.query(Vehicle.vehicle_type).filter(Vehicle.vehicle_id == trip.vehicle_id).scalar() or "uberx"
                     final_fare = round((float(trip.base_fare) + (distance * PER_KM_RATES.get(vehicle_type, 1.20))) * float(trip.surge_multiplier), 2)
@@ -247,6 +256,18 @@ def step_active_trips():
                         created_at=now
                     )
                     session.add(rating)
+
+                    # 3. Create Promotion record (~25% of completed trips use a promo code)
+                    if random.random() < 0.25:
+                        promo = Promotion(
+                            rider_id=trip.rider_id,
+                            code=random.choice(["SUMMER2026", "WELCOME50", "UBERPROMO", "DISCOUNT10"]),
+                            discount_type="percentage",
+                            discount_value=15.00,
+                            applied_trip_id=trip.trip_id,
+                            applied_at=now
+                        )
+                        session.add(promo)
 
                     print(f"[Completed] Trip #{trip.trip_id} completed! Distance: {distance}km, Final Fare: ${final_fare}, Rating: {rating_val}★")
 

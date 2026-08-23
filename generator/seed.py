@@ -47,6 +47,8 @@ def seed_cities():
             city = City(
                 city_name=c["city_name"],
                 country=c["country"],
+                lat=c["lat"],
+                lng=c["lng"],
                 surge_enabled=c["surge_enabled"],
                 timezone=c["timezone"]
             )

@@ -23,6 +23,8 @@ class City(Base):
     city_id = Column(Integer, primary_key=True, autoincrement=True)
     city_name = Column(String(100), nullable=False)
     country = Column(String(100), nullable=False)
+    lat = Column(Numeric(10, 7))
+    lng = Column(Numeric(10, 7))
     surge_enabled = Column(Boolean, default=True, nullable=False)
     timezone = Column(String(50), default="UTC", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
