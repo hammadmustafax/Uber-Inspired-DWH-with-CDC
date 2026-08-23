@@ -93,6 +93,28 @@ events + metadata                                  SCD Type 2 dimensions        
 
 ---
 
+## 5. Coding Standards & Guidelines for Agents
+
+To ensure long-term maintainability, clarity, and consistency across all pipeline components, AI agents and developers modifying this codebase must adhere to the following principles:
+
+1. **Code Simplicity & Readability**:
+   - Write natural, clean, and straightforward code.
+   - Avoid overly complex, deeply nested functions or impenetrable one-liners.
+   - Break down complicated operations into small, single-purpose helper functions with explicit input/output signatures.
+
+2. **Precise & Unambiguous Commenting**:
+   - Document every key logic area, data flow, function, and state transition with clear inline comments.
+   - Provide precise explanations for *why* specific transformations, windowing logic, or schema mappings are applied, leaving no room for ambiguity.
+
+3. **Strict Dependency Management (`requirements.txt`)**:
+   - Every time a new external library or package is imported in any Python script/module (e.g., `faker`, `psycopg2-binary`, `confluent-kafka`, `pyspark`, `dbt-core`), immediately add the library name to [requirements.txt](file:///d:/Uber_DWH/requirements.txt).
+
+4. **Zero Code Redundancy (DRY Principle)**:
+   - Eliminate duplicated logic, hardcoded configurations, or repeated helper routines across modules.
+   - Extract common data structures, database connectors, and reusable utility functions into centralized modules in `src/` or `scripts/`.
+
+---
+
 ## 6. Development & Execution Roadmap
 
 1. **Infrastructure & OLTP Setup**: Configure Docker Compose with Postgres (logical replication enabled), Redpanda, Debezium connector, and Airflow.

@@ -1,10 +1,14 @@
 """
-Python Traffic & Event Simulator for Uber-inspired OLTP Postgres database.
-Generates concurrent riders, drivers, vehicles, trip state transitions, and driver telemetry pings.
+=============================================================================
+Uber Lakehouse Platform - Traffic & Event Simulator Entrypoint
+=============================================================================
+Description: Main entrypoint for launching the ride-hailing OLTP simulator.
+             Executes seeding and continuous event stream generation.
+=============================================================================
 """
 
-def main():
-    pass
+import sys
+from generator.main import main
 
 if __name__ == "__main__":
     main()

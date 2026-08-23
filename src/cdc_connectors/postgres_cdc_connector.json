@@ -1,0 +1,30 @@
+{
+  "name": "uber-postgres-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "postgres",
+    "database.password": "postgres",
+    "database.dbname": "uber_oltp",
+    
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_uber_slot",
+    "publication.name": "debezium_uber_publication",
+    "publication.autocreate.mode": "filtered",
+    
+    "topic.prefix": "uber_cdc",
+    "table.include.list": "public.cities,public.users,public.vehicles,public.drivers,public.trip_requests,public.trips,public.driver_locations,public.payments,public.ratings,public.promotions",
+    
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    
+    "decimal.handling.mode": "double",
+    "time.precision.mode": "connect",
+    "snapshot.mode": "initial"
+  }
+}
