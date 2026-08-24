@@ -64,3 +64,4 @@ Thumbs.db
 #custom
 detailed_plans_by_phase/
 airflow/logs/
+ports.txt

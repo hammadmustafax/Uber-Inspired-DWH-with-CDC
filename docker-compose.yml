@@ -203,6 +203,31 @@ services:
     networks:
       - uber_net
 
+  # ---------------------------------------------------------------------------
+  # 7. PySpark Development Environment
+  # ---------------------------------------------------------------------------
+  spark:
+    build:
+      context: .
+      dockerfile: docker/spark/Dockerfile
+    container_name: uber_spark
+    restart: always
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8088:8080"
+      - "4040:4040"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    networks:
+      - uber_net
+
 networks:
   uber_net:
     driver: bridge
