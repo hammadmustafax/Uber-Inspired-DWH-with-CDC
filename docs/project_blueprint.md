@@ -16,14 +16,19 @@ This document outlines the 7-phase execution roadmap for building a production-s
                                                      ▼
                                             [ Databricks Streaming ]
                                                      │
-       ┌─────────────────────────────────────────────┴─────────────────────────────────────────────┐
+       ┌─────────────────────────────────────────────┼─────────────────────────────────────────────┐
        ▼                                             ▼                                             ▼
 [ Bronze Layer ]                             [ Silver Layer ]                              [ Gold Layer ]
-Append-only raw CDC                        CDC Replay, Deduplication,                     dbt Kimball Star Schema
-JSON event logs                            SCD Type 2 dimensions                          Facts & Dimensions
-                                                                                                   │
-                                                                                                   ▼
-                                                                                          [ Metabase BI ]
+Append-only raw CDC                          CDC Replay, Deduplication,                    dbt Kimball Star Schema
+JSON event logs + SHA256                     SCD Type 2 + Delta MERGE                      Facts & Dimensions +
+Event Fingerprinting                         LSN Guard + Soda Core DQ                      dbt-expectations DQ
+       │                                             │                                             │
+       └─────────────────────────────────────────────┼─────────────────────────────────────────────┘
+                                                     ▼
+                                     [ Airflow DQ & Alert Guardrails ]
+                                                     │
+                                                     ▼
+                                              [ Metabase BI ]
 ```
 
 ---
@@ -52,41 +57,47 @@ JSON event logs                            SCD Type 2 dimensions                
 ---
 
 ### Phase 3: CDC Pipeline & Event Streaming Configuration
-- **Objective**: Establish real-time CDC event extraction via Postgres WAL.
+- **Objective**: Establish real-time CDC event extraction via Postgres WAL with schema drift readiness.
 - **Components**:
-  - Debezium Postgres connector JSON registration payload.
+  - Debezium Postgres connector JSON registration payload with DDL change capturing.
   - Redpanda topics for each OLTP table.
   - Event schema validation in Redpanda Console.
-- **Deliverables**: Active Debezium connector streaming CDC `INSERT`, `UPDATE`, and `DELETE` events into Redpanda topics.
+- **Deliverables**: Active Debezium connector streaming CDC `INSERT`, `UPDATE`, and `DELETE` events into Redpanda topics with schema change tracking.
 
 ---
 
-### Phase 4: Databricks Medallion Ingestion (Bronze & Silver Layers)
-- **Objective**: Process streaming CDC events into Delta Lake Bronze and Silver layers.
+### Phase 4: Databricks Medallion Ingestion (Bronze & Silver Layers) with Idempotency & Data Quality
+- **Objective**: Process streaming CDC events into Delta Lake Bronze and Silver layers with end-to-end idempotency and automated data quality assertions.
 - **Components**:
-  - **Bronze Layer**: Spark Structured Streaming jobs reading Redpanda Kafka topics into append-only Delta Lake tables.
-  - **Silver Layer**: CDC state-replay logic resolving event ordering (`ts_ms`/`updated_at`), deduplicating row states, and modeling SCD Type 2 dimensions (`dim_rider`, `dim_driver`).
-- **Deliverables**: Operational Bronze & Silver Delta Lake tables in Databricks Community Edition workspace.
+  - **Bronze Layer**:
+    - Spark Structured Streaming jobs reading Redpanda topics into append-only Delta Lake tables.
+    - **Idempotency Engine**: Deterministic `_cdc_event_hash` generation (`SHA256(source.lsn + source.txId + table + pk + op)`) and watermark deduplication.
+    - **Schema Drift & Corrupted Records DLQ**: Delta `.option("mergeSchema", "true")` auto-evolution and Dead-Letter Queue (`bronze_corrupted_records`) capturing malformed payloads via `_corrupt_record`.
+  - **Silver Layer**:
+    - **Idempotent CDC State Replay**: Delta `MERGE INTO` logic resolving event ordering using LSN sequence guards (`source.cdc_lsn > target.last_cdc_lsn`), preventing duplicate state mutation on replayed micro-batches.
+    - **SCD Type 2 Modeling**: Maintaining history for `dim_rider` and `dim_driver`.
+    - **Data Quality Assertions**: Integrated **Soda Core** scan executions (`checks.yml` using SodaCL) enforcing missingness, uniqueness, and value range rules on Silver tables.
+- **Deliverables**: Operational Bronze & Silver Delta Lake tables in Databricks workspace with verified idempotency under streaming restarts and Soda Core DQ scans passing.
 
 ---
 
-### Phase 5: Gold Layer Kimball Star Schema & dbt Modeling
-- **Objective**: Build an analytics-ready dimensional warehouse.
+### Phase 5: Gold Layer Kimball Star Schema & dbt Modeling with Data Quality Testing
+- **Objective**: Build an analytics-ready dimensional warehouse with automated dbt data quality suites.
 - **Components**:
   - `dbt-core` project setup connected to Databricks / Silver tables.
   - **Dimensions**: `dim_rider` (SCD2), `dim_driver` (SCD2), `dim_vehicle`, `dim_city`, `dim_date`.
   - **Facts**: `fact_trips`, `fact_trip_requests` (funnel analysis), `fact_driver_pings` (telemetry).
-  - dbt data quality assertions and auto-generated data lineage documentation.
+  - **Gold Data Quality Framework**: `dbt-expectations` test suite enforcing referential integrity, column value ranges, non-null constraints, and auto-generated data lineage documentation.
 - **Deliverables**: Production-grade Gold layer star schema with dbt test suite passing.
 
 ---
 
-### Phase 6: End-to-End Pipeline Orchestration with Apache Airflow
-- **Objective**: Automate end-to-end pipeline execution and monitoring.
+### Phase 6: End-to-End Pipeline Orchestration & Data Quality Guardrails with Apache Airflow
+- **Objective**: Automate end-to-end pipeline execution, monitoring, and quality gate enforcement.
 - **Components**:
-  - Airflow DAGs triggering Spark streaming health checks, Silver batch merges, dbt transformations, and data quality checks.
-  - Alerting and error handling logic.
-- **Deliverables**: Airflow DAGs running scheduled/monitored pipeline workflows.
+  - Airflow DAGs triggering Spark streaming health checks, Silver batch merges, automated Soda Core scans, and dbt transformations.
+  - **Quality Gates & Alerting**: Automated pipeline halting and alerting if Soda Core scans or dbt tests fail.
+- **Deliverables**: Airflow DAGs running scheduled/monitored pipeline workflows with active DQ guardrails.
 
 ---
 
@@ -94,5 +105,6 @@ JSON event logs                            SCD Type 2 dimensions                
 - **Objective**: Visualize business metrics and document technical architecture.
 - **Components**:
   - Metabase dashboards covering trip funnel conversion (`searching` -> `matched` -> `completed`), driver utilization, revenue metrics, and ETA accuracy.
-  - Technical walkthrough detailing CDC design choices vs. batch polling.
+  - Technical walkthrough detailing CDC design choices, idempotency mechanics (SHA256 + LSN guard), and Soda Core DQ implementation.
 - **Deliverables**: Interactive BI dashboards and public project documentation.
+
