@@ -18,6 +18,10 @@
     "topic.prefix": "uber_cdc",
     "table.include.list": "public.cities,public.users,public.vehicles,public.drivers,public.trip_requests,public.trips,public.driver_locations,public.payments,public.ratings,public.promotions",
     
+    "include.schema.changes": "true",
+    "schema.history.internal.kafka.bootstrap.servers": "redpanda:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.uber_cdc",
+    
     "key.converter": "org.apache.kafka.connect.json.JsonConverter",
     "key.converter.schemas.enable": "true",
     "value.converter": "org.apache.kafka.connect.json.JsonConverter",
@@ -28,3 +32,4 @@
     "snapshot.mode": "initial"
   }
 }
+
