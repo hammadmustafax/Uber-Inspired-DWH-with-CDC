@@ -77,15 +77,62 @@ def main():
         .option("startingOffsets", "earliest") \
         .load()
 
-    # Convert binary key and value to string
-    df_str = df.selectExpr(
+    # 1. Convert binary key and value to string and parse JSON envelope
+    parsed_df = df.selectExpr(
         "CAST(key AS STRING) as key_str",
         "CAST(value AS STRING) as value_str",
         "topic",
         "partition",
         "offset",
         "timestamp"
+    ).withColumn("parsed_value", from_json(col("value_str"), envelope_schema))
+
+    # 2. Define logical criteria for data corruption:
+    # - value is not null but parsed payload is missing
+    # - OR _corrupt_record is populated by Spark's JSON parser
+    is_corrupt = (
+        col("value_str").isNotNull() & 
+        (col("parsed_value").isNull() | col("parsed_value.payload").isNull())
+    ) | col("parsed_value._corrupt_record").isNotNull()
+
+    # 3. Generate a event hash:
+    # - For clean records, generate a deterministic CDC event hash from payload metadata
+    # - For corrupt records, generate a unique hash from Kafka coordinates so they are never discarded
+    payload = col("parsed_value.payload")
+    unique_record_id = sha2(
+        concat_ws(
+            '|',
+            col("topic"),
+            col("partition").cast("string"),
+            col("offset").cast("string")
+        ),
+        256
     )
+    
+    event_hash_col = when(
+        ~is_corrupt,
+        sha2(
+            concat_ws(
+                '|',
+                payload.getField("source").getField("lsn"),
+                payload.getField("source").getField("txId"),
+                payload.getField("source").getField("table"),
+                col("key_str"),
+                payload.getField("op")
+            ),
+            256
+        )
+    ).otherwise(unique_record_id)
+
+    # Add hash and corruption columns to the streaming DataFrame
+    df_with_metadata = parsed_df.withColumn("_cdc_event_hash", event_hash_col) \
+                                .withColumn("is_corrupt", is_corrupt)
+
+    # 4. Apply Watermark and Drop Duplicates across the stream (Stateful Deduplication)
+    # Deduplicates clean events within a 15-minute watermark window to prevent network retry duplicates
+    df_dedup = df_with_metadata \
+        .withWatermark("timestamp", "15 minutes") \
+        .dropDuplicates(["_cdc_event_hash"])
 
     def write_to_bronze_and_dlq(batch_df, batch_id):
         print(f"Processing micro-batch {batch_id}")
@@ -93,19 +140,8 @@ def main():
         # Cache batch dataframe since it will be queried multiple times
         batch_df.cache()
         try:
-            # Parse the Debezium JSON value envelope
-            parsed_batch = batch_df.withColumn("parsed_value", from_json(col("value_str"), envelope_schema))
-
-            # Define logical criteria for data corruption:
-            # - value is not null but parsed payload is missing
-            # - OR _corrupt_record is populated by Spark's JSON parser
-            is_corrupt = (
-                col("value_str").isNotNull() & 
-                (col("parsed_value").isNull() | col("parsed_value.payload").isNull())
-            ) | col("parsed_value._corrupt_record").isNotNull()
-
             # 1. Handle Corrupt Records (Dead-Letter Queue)
-            corrupt_records = parsed_batch.filter(is_corrupt)
+            corrupt_records = batch_df.filter(col("is_corrupt"))
             if corrupt_records.count() > 0:
                 print(f"Found {corrupt_records.count()} corrupted records. Writing to DLQ.")
                 dlq_df = corrupt_records.select(
@@ -128,27 +164,12 @@ def main():
                     .save(dlq_path)
 
             # 2. Handle Clean Records
-            clean_records = parsed_batch.filter(~is_corrupt)
+            clean_records = batch_df.filter(~col("is_corrupt"))
             if clean_records.count() > 0:
                 print(f"Found {clean_records.count()} clean records. Processing CDC logic.")
-                payload = col("parsed_value.payload")
                 
-                # Generate a deterministic CDC event hash
-                # SHA256(concat_ws('|', value.source.lsn, value.source.txId, value.source.table, key, value.op))
-                event_hash_col = sha2(
-                    concat_ws(
-                        '|',
-                        payload.getField("source").getField("lsn"),
-                        payload.getField("source").getField("txId"),
-                        payload.getField("source").getField("table"),
-                        col("key_str"),
-                        payload.getField("op")
-                    ),
-                    256
-                )
-
                 final_clean_df = clean_records.select(
-                    event_hash_col.alias("_cdc_event_hash"),
+                    col("_cdc_event_hash"),
                     col("topic"),
                     col("partition"),
                     col("offset"),
@@ -184,7 +205,7 @@ def main():
             batch_df.unpersist()
 
     # Configure query and output stream
-    writer = df_str.writeStream \
+    writer = df_dedup.writeStream \
         .foreachBatch(write_to_bronze_and_dlq) \
         .option("checkpointLocation", checkpoint_dir)
 

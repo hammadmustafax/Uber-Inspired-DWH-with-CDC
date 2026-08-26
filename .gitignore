@@ -65,4 +65,4 @@ Thumbs.db
 detailed_plans_by_phase/
 airflow/logs/
 ports.txt
-data/delta/checkpoints/
+data/
