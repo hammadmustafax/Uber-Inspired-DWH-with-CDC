@@ -1,4 +1,4 @@
-FROM apache/spark:3.4.1
+FROM apache/spark:3.5.1
 
 USER root
 
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 RUN pip install --no-cache-dir \
+    pyspark==3.5.1 \
     delta-spark==3.0.0 \
     soda-core-spark==3.0.45 \
     psycopg2-binary==2.9.9 \
@@ -21,7 +22,7 @@ RUN pip install --no-cache-dir \
 USER spark
 
 # Pre-fetch Spark Kafka Integration and Delta Lake jars
-RUN spark-shell --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,io.delta:delta-spark_2.12:3.0.0 --exec "exit()"
+RUN spark-shell --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,io.delta:delta-spark_2.12:3.0.0 --exec "exit()"
 
 # Set working directory
 WORKDIR /app
