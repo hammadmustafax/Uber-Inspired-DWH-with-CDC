@@ -1,0 +1,30 @@
+# SodaCL Data Quality Checks for Uber Silver Lakehouse Tables
+# Validated using soda-core-spark against Delta Lake tables
+
+checks for silver_users:
+  - duplicate_count(user_id) = 0
+  - missing_count(user_id) = 0
+  - missing_count(email) = 0
+  - invalid_count(email) = 0:
+      valid format: email
+
+checks for silver_drivers:
+  - duplicate_count(driver_id) = 0
+  - missing_count(driver_id) = 0
+  - min(rating_avg) >= 0.0
+  - max(rating_avg) <= 5.0
+
+checks for silver_trips:
+  - duplicate_count(trip_id) = 0
+  - missing_count(trip_id) = 0
+  - missing_count(rider_id) = 0
+  - missing_count(driver_id) = 0
+  - min(base_fare) >= 0.0
+  - min(surge_multiplier) >= 1.0
+
+checks for silver_driver_locations:
+  - missing_count(location_id) = 0
+  - min(lat) >= -90.0
+  - max(lat) <= 90.0
+  - min(lng) >= -180.0
+  - max(lng) <= 180.0

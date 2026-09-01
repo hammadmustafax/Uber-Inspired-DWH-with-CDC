@@ -50,9 +50,10 @@ envelope_schema = StructType([
 
 def main():
     # Load configuration from environment variables
+    default_base_dir = "/app/data/delta" if os.path.exists("/app/data/delta") else os.path.abspath("data/delta")
     kafka_brokers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "redpanda:9092")
-    bronze_target_dir = os.getenv("BRONZE_TARGET_DIR", "/app/data/delta/bronze")
-    checkpoint_dir = os.getenv("CHECKPOINT_DIR", "/app/data/delta/checkpoints/bronze")
+    bronze_target_dir = os.getenv("BRONZE_TARGET_DIR", os.path.join(default_base_dir, "bronze"))
+    checkpoint_dir = os.getenv("CHECKPOINT_DIR", os.path.join(default_base_dir, "checkpoints", "bronze"))
     streaming_once = os.getenv("STREAMING_ONCE", "false").lower() == "true"
     dry_run = "--dry-run" in sys.argv
 
