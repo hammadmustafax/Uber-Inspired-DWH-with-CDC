@@ -16,12 +16,17 @@ def create_spark_session():
     os.environ["HADOOP_HOME"] = dummy_hadoop_dir
     os.environ["PATH"] = os.path.join(dummy_hadoop_dir, "bin") + ";" + os.environ.get("PATH", "")
 
+    spark_temp_dir = os.path.abspath("data/spark_temp").replace("\\", "/")
+    os.makedirs(spark_temp_dir, exist_ok=True)
+
     builder = SparkSession.builder \
         .appName("UberSilverSodaDataQualityScan") \
         .config("spark.driver.extraJavaOptions", f"-Dhadoop.home.dir={dummy_hadoop_dir}") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-        .config("spark.driver.host", "localhost")
+        .config("spark.driver.host", "localhost") \
+        .config("spark.local.dir", spark_temp_dir) \
+        .config("spark.sql.shuffle.partitions", "1")
     
     return configure_spark_with_delta_pip(builder).getOrCreate()
 
@@ -47,7 +52,7 @@ def run_soda_scan():
     tables_registered = 0
 
     for table in silver_tables:
-        table_path = os.path.join(silver_target_dir, f"silver_{table}")
+        table_path = os.path.join(silver_target_dir, f"silver_{table}").replace("\\", "/")
         if DeltaTable.isDeltaTable(spark, table_path):
             print(f"Registering temp view 'silver_{table}' from {table_path}")
             df = spark.read.format("delta").load(table_path)
