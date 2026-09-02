@@ -1,0 +1,28 @@
+uber_dw_gold:
+  target: databricks
+  outputs:
+    # Databricks SQL Warehouse / Lakehouse Endpoint
+    databricks:
+      type: databricks
+      schema: gold
+      host: "{{ env_var('DATABRICKS_HOST', 'your-databricks-workspace.cloud.databricks.com') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH', '/sql/1.0/warehouses/your_warehouse_id') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN', 'your_personal_access_token') }}"
+      threads: 4
+
+    # Local Spark / Thrift Server Target (for local Docker/standalone development)
+    spark_local:
+      type: spark
+      method: thrift
+      schema: gold
+      host: "{{ env_var('SPARK_THRIFT_HOST', 'localhost') }}"
+      port: 10000
+      user: "{{ env_var('SPARK_USER', 'spark') }}"
+      threads: 2
+
+    # DuckDB Local Fast Dev Engine (optional local file-based testing)
+    duckdb_local:
+      type: duckdb
+      path: 'gold_dw.duckdb'
+      schema: gold
+      threads: 4

@@ -1,0 +1,61 @@
+name: 'uber_dw_gold'
+version: '1.0.0'
+config-version: 2
+
+# Profile to use from profiles.yml
+profile: 'uber_dw_gold'
+
+# Project structure directories
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+  - "logs"
+
+# Global model configurations and materialization hierarchy
+models:
+  uber_dw_gold:
+    # Staging Layer: Lightweight views over Silver Delta Lake tables
+    staging:
+      +materialized: view
+      +schema: staging
+
+    # Marts Layer: Dimensional star schema models
+    marts:
+      core:
+        +schema: gold_core
+        
+        # Dimensions: Conformed SCD1 and SCD2 tables
+        dim_rider:
+          +materialized: table
+        dim_driver:
+          +materialized: table
+        dim_vehicle:
+          +materialized: table
+        dim_city:
+          +materialized: table
+        dim_date:
+          +materialized: table
+
+        # Facts: Incremental atomic event tables with Delta MERGE strategy
+        fact_trips:
+          +materialized: incremental
+          +file_format: delta
+          +incremental_strategy: merge
+          +unique_key: trip_sk
+        fact_trip_requests:
+          +materialized: incremental
+          +file_format: delta
+          +incremental_strategy: merge
+          +unique_key: request_sk
+        fact_driver_pings:
+          +materialized: incremental
+          +file_format: delta
+          +incremental_strategy: merge
+          +unique_key: ping_sk
