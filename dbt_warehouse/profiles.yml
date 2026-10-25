@@ -1,0 +1,10 @@
+uber_dw_gold:
+  target: databricks
+  outputs:
+    databricks:
+      type: databricks
+      schema: gold
+      host: dbc-3ecdc495-0cb9.cloud.databricks.com
+      http_path: /sql/1.0/warehouses/624f6c388dfbf9b9
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4
